@@ -1,0 +1,8 @@
+cmd/__pycache__
+cmd/databaze.db
+cmd/private_serv.prkey
+cmd/private.prkey
+cmd/rsa_gen.__pycache__cmd/test.py
+gui/__pycache__
+gui/databaze.db
+gui/test.py

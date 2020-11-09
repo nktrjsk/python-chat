@@ -1,0 +1,10 @@
+{
+    "IP": "localhost",
+    "PORT": 8080,
+    "FORMAT": "utf-8",
+    "OPEN": false,
+    "REG_KEY": true,
+    "GEN_KEY": true,
+    "NAME": "Maxův server",
+    "DESCRIPTION": "Popiči server."
+}
