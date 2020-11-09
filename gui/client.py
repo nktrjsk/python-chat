@@ -306,6 +306,7 @@ class Chat:
         def send():
 
             self.sened(["create-room", roomka.get(), heslo_var.get(), heslo_e.get(), self.name])
+            root.destroy()
 
         def check_def():
 
@@ -350,7 +351,7 @@ class Chat:
 
             for i in range(len(self.ROOMS)):
 
-                nazev = tk.Label(rooms, text=f"{self.ROOMS[i][0]}, {self.ROOMS[i][1]}")
+                nazev = tk.Label(rooms, text=f"{self.ROOMS[i][0]}, {self.ROOMS[i][1]}", fg="#ffffff", bg="#676767")
                 nazev.grid(row=i, column=0, sticky="w")
                 nazev.bind("<Button-1>", make_lambda(i))
                 
@@ -375,7 +376,13 @@ class Chat:
 
                 if text[0] == "ROOMS": refresh_room(text[1], text[2]); continue
 
-                elif text[0] == "joined-room": self.delete_chat(); continue
+                elif text[0] == "joined-room":
+                    
+                    print("joined room jako kokot")
+                    self.delete_chat()
+                    print(text[1])
+                    self.room_text.config(text=text[1])
+                    continue
 
                 if last == True:
 
@@ -395,7 +402,9 @@ class Chat:
                 self.msgbox_c.create_window((0, coord), window=msg, anchor="nw")
                 self.chat.update()
                 self.msgbox_c.config(scrollregion=self.msgbox_c.bbox("all"))
+                self.msgbox_c.yview_moveto(1.0)
 
+                print(last)
                 if last == True: coord += msg.winfo_height()
                 else: coord += msg.winfo_height() + 4
             
@@ -467,8 +476,11 @@ class Chat:
         self.room_list_vs.grid(row=0, column=1, sticky="ns")
         self.room_list_c.config(yscrollcommand=self.room_list_vs.set)
 
+        self.room_text = tk.Label(self.chat, text="Nepřipojeno", fg="#ffffff", bg="#474747", font="Arial 15")
+        self.room_text.grid(row=0, column=2, sticky="ws")
+
         self.msgbox = tk.Frame(self.chat, width=400, height=500, bg="#373737", highlightbackground="#474747")
-        self.msgbox.grid(row=0, column=2, rowspan=4, sticky="w")
+        self.msgbox.grid(row=1, column=2, rowspan=3, sticky="w")
         self.msgbox_c = tk.Canvas(self.msgbox, width=400, height=500, bg="#373737", highlightbackground="#474747")
         self.msgbox_c.grid(row=0, column=0)
         self.msgbox_vs = tk.Scrollbar(self.msgbox, orient="vertical", command=self.msgbox_c.yview)

@@ -46,157 +46,167 @@ ROOMS = {}
 ROOMS_CLIENT = []
 CLIENTS = []
 NAMES = []
+BANNED_NAMES = ["", "ROOMS", "SERVER"]
 
 class Client:
 
     def join_room(self, name):
         
-        if self.room != str(): ROOMS[self.room][3].remove([self.conn, self.pu_key_client, name])
-        ROOMS[name][3].append([self.conn, self.pu_key_client, name])
+        if self.room != str():
+            
+            ROOMS[self.room][3].remove([self.conn, self.pu_key_client, self.name])
+
+        ROOMS[name][3].append([self.conn, self.pu_key_client, self.name])
         self.room = name
-        self.sened(["joined-room"])
+        self.sened(["joined-room", self.room])
 
     def __init__(self, conn, address):
 
         self.conn = conn
         self.address = address
 
-        try:
+        conn.send(pickle.dumps([NAME, DESCRIPTION, authshow, RSA, REG_KEY]))
 
-            conn.send(pickle.dumps([NAME, DESCRIPTION, authshow, RSA, REG_KEY]))
+        if RSA == True:
+            
+            key = conn.recv(1024)
+            self.pu_key_client = ae.RSA.import_key(key)
 
-            if RSA == True:
+            pr_key_ser = ae.prkey_generate(1024)
+            pu_key_ser = ae.pukey(pr_key_ser)
+
+            conn.send(pu_key_ser.export_key())
+
+            encryptor = ae.encryptor(self.pu_key_client)
+            enc = ae.Enc(encryptor).enc
+            
+            decryptor = ae.decryptor(pr_key_ser)
+            dec = ae.Dec(decryptor).dec
+
+            def sened(data):
+
+                text = pickle.dumps(data)
+                text = text + b"/END#"
+
+                while True:
+
+                    if text == b"": break
+                    part = text[:50]
+                    conn.send(enc(part))
+                    text = text[50:]
+            
+            def recev():
+
+                text = bytes()
+    
+                while True:
+
+                    if b"/END#" in text: break
+                    part = conn.recv(128)
+                    part = dec(part)
+                    text += part
                 
-                key = conn.recv(1024)
-                self.pu_key_client = ae.RSA.import_key(key)
+                text = text.replace(b"/END#", b"")
+                text = pickle.loads(text)
 
-                pr_key_ser = ae.prkey_generate(1024)
-                pu_key_ser = ae.pukey(pr_key_ser)
-
-                conn.send(pu_key_ser.export_key())
-
-                encryptor = ae.encryptor(self.pu_key_client)
-                enc = ae.Enc(encryptor).enc
-                
-                decryptor = ae.decryptor(pr_key_ser)
-                dec = ae.Dec(decryptor).dec
-
-                def sened(data):
-
-                    text = pickle.dumps(data)
-                    text = text + b"/END#"
-
-                    while True:
-
-                        if text == b"": break
-                        part = text[:50]
-                        conn.send(enc(part))
-                        text = text[50:]
-                
-                def recev():
-
-                    text = bytes()
+                return text
         
-                    while True:
+        else:
 
-                        if b"/END#" in text: break
-                        part = conn.recv(128)
-                        part = dec(part)
-                        text += part
-                    
-                    text = text.replace(b"/END#", b"")
-                    text = pickle.loads(text)
+            def sened(data):
 
-                    return text
-            
-            else:
+                text = pickle.dumps(data)
+                text = text + b"/END#"
 
-                def sened(data):
+                while True:
 
-                    text = pickle.dumps(data)
-                    text = text + b"/END#"
+                    if text == b"": break
+                    part = text[:50]
+                    conn.send(part)
+                    text = text[50:]
 
-                    while True:
+            def recev():
 
-                        if text == b"": break
-                        part = text[:50]
-                        conn.send(part)
-                        text = text[50:]
+                text = bytes()
+    
+                while True:
 
-                def recev():
-
-                    text = bytes()
-        
-                    while True:
-
-                        if b"/END#" in text: break
-                        part = conn.recv(128)
-                        text += part
-                    
-                    text = text.replace(b"/END#", b"")
-                    text = pickle.loads(text)
-
-                    return text
-            
-            self.sened = sened
-            self.recev = recev
-
-            while True:
-
-                auth = recev()
-
-                if auth[0] == "log":
-
-                    if OPEN == True:
-
-                        if auth[1] in NAMES:
-                            
-                            sened("#conn-name-0")
-                            continue
-                        
-                        else:
-                            
-                            NAMES.append(auth[1])
-                            CLIENTS.append([conn, self.pu_key_client, auth[1]])
-                            sened("#conn-1")
-                            break
-
-                    if OPEN == False:
-
-                        if dt.check_user(auth[1], auth[2]) == True:
-
-                            NAMES.append(auth[1])
-                            CLIENTS.append([conn, self.pu_key_client, auth[1]])
-                            sened("#conn-1")
-                            break
-
-                        else: sened("#conn-0"); continue
+                    if b"/END#" in text: break
+                    part = conn.recv(128)
+                    text += part
                 
-                elif auth[0] == "reg":
+                text = text.replace(b"/END#", b"")
+                text = pickle.loads(text)
 
-                    reg_stav = True
+                return text
+        
+        self.sened = sened
+        self.recev = recev
 
-                    if REG_KEY == True:
+        while True:
 
-                        if dt.check_reg_key(auth[3]) == False:
-            
-                            sened("#reg-0-key")
-                            reg_stav = False
-                            continue
-                    
-                    if dt.check_name(auth[1]) == True:
+            try: auth = recev()
+            except ConnectionResetError: return
+
+            if auth[0] == "log":
+
+                if OPEN == True:
+
+                    print(repr(auth[1]))
+                    print(auth[1] in NAMES, auth[1] in BANNED_NAMES)
+
+                    if auth[1] in NAMES or auth[1] in BANNED_NAMES:
                         
-                        sened("#username-taken")
+                        sened("#conn-name-0")
+                        continue
+                    
+                    else:
+                        
+                        NAMES.append(auth[1])
+                        CLIENTS.append([conn, self.pu_key_client, auth[1]])
+                        sened("#conn-1")
+                        break
+
+                if OPEN == False:
+
+                    if dt.check_user(auth[1], auth[2]) == True:
+
+                        NAMES.append(auth[1])
+                        CLIENTS.append([conn, self.pu_key_client, auth[1]])
+                        sened("#conn-1")
+                        break
+
+                    else: sened("#conn-0"); continue
+            
+            elif auth[0] == "reg":
+
+                reg_stav = True
+
+                if auth[1] in BANNED_NAMES: sened("#username-taken")
+
+                if REG_KEY == True:
+
+                    if dt.check_reg_key(auth[3]) == False:
+        
+                        sened("#reg-0-key")
                         reg_stav = False
                         continue
+                
+                if dt.check_name(auth[1]) == True:
+                    
+                    sened("#username-taken")
+                    reg_stav = False
+                    continue
 
-                    if reg_stav == True:
-                        
-                        dt.add_user(auth[1], auth[2])
-                        sened("#reg-1")
+                if reg_stav == True:
+                    
+                    dt.add_user(auth[1], auth[2])
+                    sened("#reg-1")
                 
 
-            print(f"Připojen: {auth[1]}")
+        print(f"Připojen: {auth[1]}")
+
+        try:
 
             self.name = auth[1]
             self.room = str()
@@ -233,16 +243,15 @@ class Client:
 
                     except KeyError: print("chyba")
 
-        except ConnectionResetError:
+        except:
 
-            try: ROOMS[text[1]][3].remove([conn, self.pu_key_client, self.name])
-            except: pass
+            #try: 
+            ROOMS[self.room][3].remove([conn, self.pu_key_client, self.name])
+            #except: pass
             CLIENTS.remove([conn, self.pu_key_client, self.name])
             NAMES.remove(self.name)
             print(f"Odpojen: {self.name}")
             print(threading.active_count())
-        
-        except ValueError: pass
 
 def broadcast(data, clients, name):
         
