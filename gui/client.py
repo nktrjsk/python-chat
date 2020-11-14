@@ -124,24 +124,31 @@ class Login:
                                 part = text[:50]
                                 self.conn.send(enc(part))
                                 text = text[50:]
-                
+                    
                         def recev():
 
-                            text = bytes()
-                
-                            while True:
+                            try:
 
-                                if b"/END#" in text: break
-                                part = self.conn.recv(128)
-                                part = dec(part)
-                                text += part
+                                text = bytes()
+                    
+                                while True:
+
+                                    if b"/END#" in text: break
+                                    part = self.conn.recv(128)
+                                    part = dec(part)
+                                    text += part
+                                
+                                text = text.replace(b"/END#", b"")
+                                text = pickle.loads(text)
+
+                                return text
                             
-                            text = text.replace(b"/END#", b"")
-                            text = pickle.loads(text)
-
-                            return text
+                            except ConnectionAbortedError: pass
 
                     else:
+
+                        enc = None
+                        dec = None
 
                         def sened(data):
 
@@ -157,19 +164,23 @@ class Login:
 
                         def recev():
 
-                            text = bytes()
-                
-                            while True:
+                            try:
 
-                                if b"/END#" in text: break
-                                part = self.conn.recv(128)
-                                part = part
-                                text += part
-                            
-                            text = text.replace(b"/END#", b"")
-                            text = pickle.loads(text)
+                                text = bytes()
+                    
+                                while True:
 
-                            return text
+                                    if b"/END#" in text: break
+                                    part = self.conn.recv(128)
+                                    part = part
+                                    text += part
+                                
+                                text = text.replace(b"/END#", b"")
+                                text = pickle.loads(text)
+
+                                return text
+
+                            except ConnectionAbortedError: pass
 
                     status.destroy()
 
@@ -297,9 +308,7 @@ class Chat:
 
     def join_room(self, name): self.sened(["join-room", name])
 
-    def leave_room(self):
-
-        pass
+    def remove_room(self, name): self.sened(["remove-room", name, self.name])
     
     def create_room(self):
 
@@ -334,30 +343,63 @@ class Chat:
 
         def refresh_room(typ, data):
 
-            def make_lambda(i): return lambda event: self.join_room(self.ROOMS[i][0])
+            def join_room(i): return lambda event: self.join_room(self.ROOMS[i][0])
+
+            def remove_room(i): return lambda: self.remove_room(self.ROOMS[i][0])
 
             if typ == "init-room": self.ROOMS = data
 
             elif typ == "add-room": self.ROOMS.append(data)
             
-            elif typ == "rem-room": self.ROOMS.remove(data)
+            elif typ == "rem-room": print("pičo data", data); self.ROOMS.remove(data)
 
-            print(self.ROOMS)
+            self.room_list_c.delete("all")
 
-            try: rooms.destroy()
-            except: pass
+            try: self.rooms.destroy(); print("ano")
+            except AttributeError: pass
 
-            rooms = tk.Frame(self.room_list_c, bg="#373737")
+            print("nějaký roomky", self.ROOMS)
+
+            self.rooms = tk.Frame(self.room_list_c, bg="#373737")
 
             for i in range(len(self.ROOMS)):
 
-                nazev = tk.Label(rooms, text=f"{self.ROOMS[i][0]}, {self.ROOMS[i][1]}", fg="#ffffff", bg="#676767")
+                nazev = tk.Label(self.rooms, text=f"{self.ROOMS[i][0]}, {self.ROOMS[i][1]}", fg="#ffffff", bg="#676767")
                 nazev.grid(row=i, column=0, sticky="w")
-                nazev.bind("<Button-1>", make_lambda(i))
+                nazev.bind("<Button-1>", join_room(i))
+
+                if self.ROOMS[i][2] == self.name:
+
+                    remove_btn = tk.Button(self.rooms, text="Odstranit", command=remove_room(i))
+                    remove_btn.grid(row=i, column=1)
                 
-            self.room_list_c.create_window((0, 0), window=rooms, anchor="nw")
+            self.room_list_c.create_window((0, 0), window=self.rooms, anchor="nw")
             self.chat.update()
             self.room_list_c.config(scrollregion=self.room_list_c.bbox("all"))
+
+        def refresh_client(typ, data):
+
+            if typ == "init-cl": self.CLIENTS = data
+
+            elif typ == "add-cl": self.CLIENTS.append(data)
+            
+            elif typ == "rem-cl": print("pičo data", data); self.CLIENTS.remove(data)
+
+            self.clients_c.delete("all")
+
+            try: self.clients_frame.destroy(); print("ano")
+            except AttributeError: pass
+
+            self.clients_frame = tk.Frame(self.clients_c, bg="#373737")
+
+            for i in range(len(self.CLIENTS)):
+
+                nazev = tk.Label(self.clients_frame, text=self.CLIENTS[i][0], fg="#ffffff", bg="#676767")
+                nazev.grid(row=i, column=0, sticky="w")
+                
+            self.clients_c.create_window((0, 0), window=self.clients_frame, anchor="nw")
+            self.chat.update()
+            self.clients_c.config(scrollregion=self.clients_c.bbox("all"))
 
         coord = 0
         last_name = str()
@@ -376,10 +418,13 @@ class Chat:
 
                 if text[0] == "ROOMS": refresh_room(text[1], text[2]); continue
 
+                elif text[0] == "CLIENTS": refresh_client(text[1], text[2]); continue
+
                 elif text[0] == "joined-room":
                     
                     print("joined room jako kokot")
                     self.delete_chat()
+                    coord = 0
                     print(text[1])
                     self.room_text.config(text=text[1])
                     continue
@@ -469,7 +514,7 @@ class Chat:
         self.create_room_b.grid(row=2, column=0, sticky="ws")
 
         self.room_list = tk.Frame(self.chat, width=300, height=200, bg="#777777", highlightbackground="#474747")
-        self.room_list.grid(row=3, column=0, rowspan=1, columnspan=2, sticky="w")
+        self.room_list.grid(row=3, column=0, rowspan=2, columnspan=2, sticky="w")
         self.room_list_c = tk.Canvas(self.room_list, width=300, height=200, bg="#777777", highlightbackground="#474747")
         self.room_list_c.grid(row=0, column=0)
         self.room_list_vs = tk.Scrollbar(self.room_list, orient="vertical", command=self.room_list_c.yview)
@@ -479,17 +524,24 @@ class Chat:
         self.room_text = tk.Label(self.chat, text="Nepřipojeno", fg="#ffffff", bg="#474747", font="Arial 15")
         self.room_text.grid(row=0, column=2, sticky="ws")
 
-        self.msgbox = tk.Frame(self.chat, width=400, height=500, bg="#373737", highlightbackground="#474747")
+        self.msgbox = tk.Frame(self.chat, width=400, height=400, bg="#373737", highlightbackground="#474747")
         self.msgbox.grid(row=1, column=2, rowspan=3, sticky="w")
-        self.msgbox_c = tk.Canvas(self.msgbox, width=400, height=500, bg="#373737", highlightbackground="#474747")
+        self.msgbox_c = tk.Canvas(self.msgbox, width=400, height=400, bg="#373737", highlightbackground="#474747")
         self.msgbox_c.grid(row=0, column=0)
         self.msgbox_vs = tk.Scrollbar(self.msgbox, orient="vertical", command=self.msgbox_c.yview)
         self.msgbox_vs.grid(row=0, column=1, sticky="ns")
         self.msgbox_c.config(yscrollcommand=self.msgbox_vs.set)
 
+        self.clients = tk.Frame(self.chat, width=200, height=460, bg="#676767", highlightbackground="#474747")
+        self.clients.grid(row=1, column=3, rowspan=4, sticky="w")
+        self.clients_c = tk.Canvas(self.clients, width=200, height=460, bg="#676767", highlightbackground="#474747")
+        self.clients_c.grid(row=0, column=0)
+        self.clients_vs = tk.Scrollbar(self.clients, orient="vertical", command=self.clients_c.yview)
+        self.clients_vs.grid(row=0, column=1, sticky="ns")
+        self.clients_c.config(yscrollcommand=self.clients_vs.set)
 
-        self.textos = tk.Text(self.chat, height=3, bg="#474747", fg="#ffffff")
-        self.textos.grid(row=4, column=0, columnspan=3, sticky="wse")
+        self.textos = tk.Text(self.chat, height=3, width=10, bg="#474747", fg="#ffffff")
+        self.textos.grid(row=4, column=2, sticky="wse")
 
         self.chat.bind("<Shift-Return>", func=lambda event: self.send(event, send="enter"))
         self.chat.bind("<Return>", func=lambda event: self.send(event, send="send"))

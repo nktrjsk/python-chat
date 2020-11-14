@@ -55,10 +55,15 @@ class Client:
         if self.room != str():
             
             ROOMS[self.room][3].remove([self.conn, self.pu_key_client, self.name])
+            broadcast(["CLIENTS", "rem-cl", self.name], ROOMS[self.room][3], "SERVER")
 
         ROOMS[name][3].append([self.conn, self.pu_key_client, self.name])
         self.room = name
+        print(ROOMS[self.room][3])
         self.sened(["joined-room", self.room])
+        broadcast(["CLIENTS", "init-cl", [ROOMS[self.room][3][i][2] for i in range(len(ROOMS[self.room][3]))]],
+            [[self.conn, self.pu_key_client, self.name]], "SERVER")
+        broadcast(["CLIENTS", "add-cl", self.name], ROOMS[self.room][3], "SERVER")
 
     def __init__(self, conn, address):
 
@@ -112,6 +117,8 @@ class Client:
                 return text
         
         else:
+
+            self.pu_key_client = None
 
             def sened(data):
 
@@ -221,6 +228,8 @@ class Client:
 
                 if text[0] == "create-room": create_room(text[1], text[2], text[3], text[4]); continue
 
+                if text[0] == "remove-room": remove_room(text[1], text[2]); continue
+
                 elif text[0] == "join-room":
                     
                     if self.room != text[1]:
@@ -243,11 +252,13 @@ class Client:
 
                     except KeyError: print("chyba")
 
-        except:
+        except ConnectionResetError:
+            
+            if self.room != str():
+                
+                ROOMS[self.room][3].remove([conn, self.pu_key_client, self.name])
+                broadcast(["CLIENTS", "rem-cl", self.name], ROOMS[self.room][3], "SERVER")
 
-            #try: 
-            ROOMS[self.room][3].remove([conn, self.pu_key_client, self.name])
-            #except: pass
             CLIENTS.remove([conn, self.pu_key_client, self.name])
             NAMES.remove(self.name)
             print(f"Odpojen: {self.name}")
@@ -255,40 +266,44 @@ class Client:
 
 def broadcast(data, clients, name):
         
-        if type(data) == str:
-            
-            text = pickle.dumps([name, data, cas()])
+    if type(data) == str:
 
-            for i in data.split():
-            
-                if i in emojiz.emojis: text = text.replace(i, emojiz.emojis[i])
+        for i in data.split():
 
-        else: text = pickle.dumps(data)
-        text = text + b"/END#"
-
-        if RSA == True:
-            
-            for i in clients:
-
-                send_text = text
-
-                while True:
-
-                    if send_text == b"": break
-                    part = send_text[:50]
-                    i[0].send(ae.Enc(ae.encryptor(i[1])).enc(part))
-                    send_text = send_text[50:]
+            print(i)
         
-        else:
+            if i in emojiz.emojis: data = data.replace(i, emojiz.emojis[i])
 
-            for i in clients:
-                
-                while True:
+        text = pickle.dumps([name, data, cas()])
 
-                    if send_text == b"": break
-                    part = send_text[:50]
-                    i[0].send(part)
-                    send_text = send_text[50:]
+    else: text = pickle.dumps(data)
+    text = text + b"/END#"
+
+    if RSA == True:
+        
+        for i in clients:
+
+            send_text = text
+
+            while True:
+
+                if send_text == b"": break
+                part = send_text[:50]
+                i[0].send(ae.Enc(ae.encryptor(i[1])).enc(part))
+                send_text = send_text[50:]
+    
+    else:
+
+        for i in clients:
+
+            send_text = text
+            
+            while True:
+
+                if send_text == b"": break
+                part = send_text[:50]
+                i[0].send(part)
+                send_text = send_text[50:]
 
 def cas():
 
@@ -304,9 +319,27 @@ def cas():
 def create_room(name, auth, password, creator):
 
     ROOMS[name] = [auth, password, creator, []]
-    ROOMS_CLIENT.append([name, auth])
+    ROOMS_CLIENT.append([name, auth, creator])
 
-    broadcast(["ROOMS", "add-room", [name, auth]], CLIENTS, "SERVER")
+    broadcast(["ROOMS", "add-room", [name, auth, creator]], CLIENTS, "SERVER")
+
+def remove_room(name, user):
+
+    auth = ROOMS[name][0]
+    creator = ROOMS[name][2]
+
+    print("klient věc", ROOMS_CLIENT)
+
+    if ROOMS[name][2] == user:
+
+        print("klient věc", [name, auth, creator])
+        
+        ROOMS.pop(name)
+        ROOMS_CLIENT.remove([name, auth, creator])
+
+        broadcast(["ROOMS", "rem-room", [name, auth, creator]], CLIENTS, "SERVER")
+        
+        print(f"roomka {name} gon")
 
 while True:
 
