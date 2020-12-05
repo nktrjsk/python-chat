@@ -3,8 +3,8 @@
     "PORT": 8080,
     "OPEN": true,
     "REG_KEY": false,
-    "NAME": "Maxův server",
-    "DESCRIPTION": "Popiči server.",
+    "NAME": "",
+    "DESCRIPTION": "",
     "RSA": true,
     "RSA_LENGHT": 2048
 }
