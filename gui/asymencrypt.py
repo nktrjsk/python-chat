@@ -1,4 +1,3 @@
-import socket
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from Crypto.Cipher import PKCS1_OAEP
@@ -8,39 +7,34 @@ random_generator = Random.new().read
 def prkey_generate(size): return RSA.generate(size, random_generator)
 
 def prkey_load(filepath):
-
     with open(str(filepath) + ".prkey", "rb") as file:
-
         key = file.read()
         
         return RSA.import_key(key)
 
 def prkey_export(filepath, size):
-
     with open(str(filepath) + ".prkey", "wb") as file:
-
         file.write(prkey_generate(size).export_key())
 
-def pukey(prkey): return prkey.publickey()
+pukey = lambda prkey: prkey.publickey()
 
 encryptor = lambda pukey: PKCS1_OAEP.new(pukey)
 class Enc:
+    def __init__(self, encryptor): self.encryptor = encryptor
 
-    def __init__(self, encryptor):
-
-        self.encryptor = encryptor
-
-    def enc(self, text):
-
-        return self.encryptor.encrypt(text)
+    def enc(self, text): return self.encryptor.encrypt(text)
 
 decryptor = lambda prkey: PKCS1_OAEP.new(prkey)
 class Dec:
+    def __init__(self, decryptor): self.decryptor = decryptor
 
-    def __init__(self, decryptor):
+    def dec(self, ciphertext): return self.decryptor.decrypt(ciphertext)
 
-        self.decryptor = decryptor
+""" class Encryption:
+    def __init__(self, size: int):
+        self.prkey = RSA.generate(size, Random.new().read)
+        self.pukey = self.prkey.publickey()
+        self.encryptor = PKCS1_OAEP.new(self.pukey)
+        self.decryptor = PKCS1_OAEP.new(self.prkey)
 
-    def dec(self, ciphertext):
-
-        return self.decryptor.decrypt(ciphertext)
+    def enc(self, text: str): """

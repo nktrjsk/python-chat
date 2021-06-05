@@ -1,0 +1,2 @@
+pycryptodome==3.9.8
+checksumdir==1.2.0

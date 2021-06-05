@@ -1,8 +1,8 @@
 {
     "IP": "localhost",
-    "PORT": 8080,
+    "PORT": 10498,
     "OPEN": true,
-    "REG_KEY": false,
+    "REG_KEY": true,
     "NAME": "Maxův server",
     "DESCRIPTION": "Popiči server.",
     "RSA": true,

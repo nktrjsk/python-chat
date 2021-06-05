@@ -6,3 +6,5 @@ cmd/rsa_gen.__pycache__cmd/test.py
 gui/__pycache__
 gui/databaze.db
 gui/test.py
+gui/cl_emotes/*
+gui/emotes/*
